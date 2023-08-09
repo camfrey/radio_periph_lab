@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 entity simple_rx_fifo_v1_0_S_AXI is
 	generic (
 		-- Users to add parameters here
-
+		C_FIFO_DEPTH : integer := 512;
 		-- User parameters ends
 		-- Do not modify the parameters beyond this line
 
@@ -16,7 +16,8 @@ entity simple_rx_fifo_v1_0_S_AXI is
 	);
 	port (
 		-- Users to add ports here
-
+        s_axis_tdata : in std_logic_vector(31 downto 0);
+		s_axis_tvalid : std_logic;
 		-- User ports ends
 		-- Do not modify the ports beyond this line
 
@@ -108,15 +109,21 @@ architecture arch_imp of simple_rx_fifo_v1_0_S_AXI is
 	---- Signals for user logic register space example
 	--------------------------------------------------
 	---- Number of Slave Registers 4
-	signal slv_reg0	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-	signal slv_reg1	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-	signal slv_reg2	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+	signal control_reg	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+--	signal fifo_occupancy_reg	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+	signal fifo_data_reg	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg3	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal slv_reg_rden	: std_logic;
 	signal slv_reg_wren	: std_logic;
 	signal reg_data_out	:std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
 	signal byte_index	: integer;
 	signal aw_en	: std_logic;
+	
+	type fifo_type is array (C_FIFO_DEPTH - 1 downto 0) of std_logic_vector(31 downto 0);
+	signal rx_fifo : fifo_type;
+	
+	signal fifo_rd_en : std_logic;
+	signal fifo_data_ptr : unsigned(31 downto 0);
 
 begin
 	-- I/O Connections assignments
@@ -214,9 +221,9 @@ begin
 	begin
 	  if rising_edge(S_AXI_ACLK) then 
 	    if S_AXI_ARESETN = '0' then
-	      slv_reg0 <= (others => '0');
-	      slv_reg1 <= (others => '0');
-	      slv_reg2 <= (others => '0');
+	      control_reg <= (others => '0');
+--	      fifo_occupancy_reg <= (others => '0');
+	      -- fifo_data_reg <= (others => '0');
 	      slv_reg3 <= (others => '0');
 	    else
 	      loc_addr := axi_awaddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
@@ -227,25 +234,25 @@ begin
 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
 	                -- Respective byte enables are asserted as per write strobes                   
 	                -- slave registor 0
-	                slv_reg0(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+	                control_reg(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
 	              end if;
 	            end loop;
-	          when b"01" =>
-	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
-	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
-	                -- Respective byte enables are asserted as per write strobes                   
-	                -- slave registor 1
-	                slv_reg1(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
-	              end if;
-	            end loop;
-	          when b"10" =>
-	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
-	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
-	                -- Respective byte enables are asserted as per write strobes                   
-	                -- slave registor 2
-	                slv_reg2(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
-	              end if;
-	            end loop;
+--	          when b"01" =>
+--	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+--	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+--	                -- Respective byte enables are asserted as per write strobes                   
+--	                -- slave registor 1
+--	                fifo_occupancy_reg(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+--	              end if;
+--	            end loop;
+--	          when b"10" =>
+--	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+--	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+--	                -- Respective byte enables are asserted as per write strobes                   
+--	                -- slave registor 2
+--	                fifo_data_reg(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+--	              end if;
+--	            end loop;
 	          when b"11" =>
 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
@@ -255,9 +262,9 @@ begin
 	              end if;
 	            end loop;
 	          when others =>
-	            slv_reg0 <= slv_reg0;
-	            slv_reg1 <= slv_reg1;
-	            slv_reg2 <= slv_reg2;
+	            control_reg <= control_reg;
+--	            fifo_occupancy_reg <= std_logic_vector(fifo_data_ptr);
+--	            fifo_data_reg <= fifo_data_reg;
 	            slv_reg3 <= slv_reg3;
 	        end case;
 	      end if;
@@ -346,18 +353,18 @@ begin
 	-- and the slave is ready to accept the read address.
 	slv_reg_rden <= axi_arready and S_AXI_ARVALID and (not axi_rvalid) ;
 
-	process (slv_reg0, slv_reg1, slv_reg2, slv_reg3, axi_araddr, S_AXI_ARESETN, slv_reg_rden)
+	process (control_reg, fifo_data_ptr, fifo_data_reg, slv_reg3, axi_araddr, S_AXI_ARESETN, slv_reg_rden)
 	variable loc_addr :std_logic_vector(OPT_MEM_ADDR_BITS downto 0);
 	begin
 	    -- Address decoding for reading registers
 	    loc_addr := axi_araddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
 	    case loc_addr is
 	      when b"00" =>
-	        reg_data_out <= slv_reg0;
+	        reg_data_out <= control_reg;
 	      when b"01" =>
-	        reg_data_out <= slv_reg1;
+	        reg_data_out <= std_logic_vector(fifo_data_ptr);
 	      when b"10" =>
-	        reg_data_out <= slv_reg2;
+	        reg_data_out <= fifo_data_reg;
 	      when b"11" =>
 	        reg_data_out <= slv_reg3;
 	      when others =>
@@ -367,17 +374,24 @@ begin
 
 	-- Output register or memory read data
 	process( S_AXI_ACLK ) is
+	variable loc_addr :std_logic_vector(OPT_MEM_ADDR_BITS downto 0);
 	begin
+	  loc_addr := axi_araddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
 	  if (rising_edge (S_AXI_ACLK)) then
 	    if ( S_AXI_ARESETN = '0' ) then
 	      axi_rdata  <= (others => '0');
+	      fifo_rd_en <= '0';
 	    else
+	      fifo_rd_en <= '0';
 	      if (slv_reg_rden = '1') then
 	        -- When there is a valid read address (S_AXI_ARVALID) with 
 	        -- acceptance of read address by the slave (axi_arready), 
 	        -- output the read dada 
 	        -- Read address mux
-	          axi_rdata <= reg_data_out;     -- register read data
+	        axi_rdata <= reg_data_out;     -- register read data  
+	        if loc_addr = b"10" then
+	          fifo_rd_en <= '1';
+	        end if;
 	      end if;   
 	    end if;
 	  end if;
@@ -385,6 +399,27 @@ begin
 
 
 	-- Add user logic here
+	process ( S_AXI_ACLK ) begin
+        if rising_edge(S_AXI_ACLK) then
+           if (S_AXI_ARESETN = '0') then
+               rx_fifo <= (others => (others => '0'));
+               fifo_data_ptr <= (others => '0');
+           else
+               if (fifo_rd_en = '1' and fifo_data_ptr > 0) then
+                   fifo_data_reg <= rx_fifo(0);
+                   rx_fifo <= x"00000000" & rx_fifo(C_FIFO_DEPTH - 1 downto 1);
+                   fifo_data_ptr <= fifo_data_ptr - 1;
+               elsif (fifo_rd_en = '1' and s_axis_tvalid = '1' and fifo_data_ptr > 0) then
+                   fifo_data_reg <= rx_fifo(0);
+                   rx_fifo <= x"00000000" & rx_fifo(C_FIFO_DEPTH - 1 downto 1);
+                   rx_fifo(to_integer(fifo_data_ptr)) <= s_axis_tdata;
+               elsif (s_axis_tvalid = '1' and fifo_data_ptr < (C_FIFO_DEPTH - 2)) then
+                   rx_fifo(to_integer(fifo_data_ptr)) <= s_axis_tdata;
+                   fifo_data_ptr <= fifo_data_ptr + 1;
+               end if;
+           end if;
+        end if;
+	end process;
 
 	-- User logic ends
 

@@ -4,8 +4,8 @@ use ieee.numeric_std.all;
 
 entity simple_rx_fifo_v1_0 is
 	generic (
-		-- Users to add parameters here
-
+		-- Users to add parameters name
+		C_FIFO_DEPTH : integer := 512;
 		-- User parameters ends
 		-- Do not modify the parameters beyond this line
 
@@ -16,7 +16,8 @@ entity simple_rx_fifo_v1_0 is
 	);
 	port (
 		-- Users to add ports here
-
+		s_axis_tdata : in std_logic_vector(31 downto 0);
+		s_axis_tvalid : std_logic;
 		-- User ports ends
 		-- Do not modify the ports beyond this line
 
@@ -51,10 +52,13 @@ architecture arch_imp of simple_rx_fifo_v1_0 is
 	-- component declaration
 	component simple_rx_fifo_v1_0_S_AXI is
 		generic (
+		C_FIFO_DEPTH : integer := 512;
 		C_S_AXI_DATA_WIDTH	: integer	:= 32;
 		C_S_AXI_ADDR_WIDTH	: integer	:= 4
 		);
 		port (
+        s_axis_tdata : in std_logic_vector(31 downto 0);
+		s_axis_tvalid : std_logic;
 		S_AXI_ACLK	: in std_logic;
 		S_AXI_ARESETN	: in std_logic;
 		S_AXI_AWADDR	: in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
@@ -84,10 +88,13 @@ begin
 -- Instantiation of Axi Bus Interface S_AXI
 simple_rx_fifo_v1_0_S_AXI_inst : simple_rx_fifo_v1_0_S_AXI
 	generic map (
+	    C_FIFO_DEPTH => C_FIFO_DEPTH,
 		C_S_AXI_DATA_WIDTH	=> C_S_AXI_DATA_WIDTH,
 		C_S_AXI_ADDR_WIDTH	=> C_S_AXI_ADDR_WIDTH
 	)
 	port map (
+	    s_axis_tdata => s_axis_tdata,
+	    s_axis_tvalid => s_axis_tvalid,
 		S_AXI_ACLK	=> s_axi_aclk,
 		S_AXI_ARESETN	=> s_axi_aresetn,
 		S_AXI_AWADDR	=> s_axi_awaddr,
